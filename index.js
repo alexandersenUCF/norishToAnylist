@@ -1,8 +1,10 @@
 require('dotenv').config();
+const express = require('express');
 const axios = require('axios');
 const { GoogleGenAI } = require('@google/genai');
 const AnyList = require('anylist');
 const cron = require('node-cron');
+const path = require('path');
 
 // Check required environment variables
 const REQUIRED_ENV_VARS = [
@@ -26,18 +28,11 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 async function fetchNorishList() {
   try {
     console.log(`Fetching shopping list from Norish (${process.env.NORISH_API_URL})...`);
-    // NOTE: This assumes Norish exposes an endpoint to get the shopping list.
-    // Replace with the exact API call for your Norish instance or Postgres logic.
     const response = await axios.get(process.env.NORISH_API_URL, {
       headers: {
         'Authorization': `Bearer ${process.env.NORISH_API_KEY}`,
       }
     });
-
-    // Norish returns the list, let's extract raw ingredient strings.
-    // Example format needs adjusting based on the real API response:
-    // response.data could be something like: [{ id: 1, text: "a pinch of kosher salt" }, ...]
-    // We assume an array of items with a 'text' or similar property. Adjust as needed.
 
     let rawItems = [];
     if (Array.isArray(response.data)) {
@@ -105,7 +100,6 @@ async function syncWithAnyList(normalizedItems) {
     console.log('Fetching AnyList data...');
     await anylist.getLists();
 
-    // Default to the first list if "Grocery" isn't found, or find by name.
     const listName = process.env.ANYLIST_LIST_NAME || 'Grocery';
     let targetList = anylist.getListByName(listName);
 
@@ -130,14 +124,11 @@ async function syncWithAnyList(normalizedItems) {
       if (!item.name) continue;
 
       const ingredientName = item.name;
-      // Simple exact deduplication (can be improved with fuzzy matching if needed)
       if (currentItemNames.includes(ingredientName.toLowerCase())) {
         console.log(`Skipping existing item: ${ingredientName}`);
         continue;
       }
 
-      // Format name to include quantity if it exists for AnyList
-      // AnyList doesn't natively handle "quantities" the same way, usually it's combined in the name or details.
       let finalName = ingredientName;
       let details = item.quantity ? `Quantity: ${item.quantity}` : '';
 
@@ -154,7 +145,7 @@ async function syncWithAnyList(normalizedItems) {
     console.log(`Successfully added ${addedCount} new items to AnyList.`);
 
     anylist.teardown();
-
+    return addedCount;
   } catch (error) {
     console.error('Error syncing with AnyList:', error);
     anylist.teardown();
@@ -162,19 +153,32 @@ async function syncWithAnyList(normalizedItems) {
   }
 }
 
+let isSyncing = false;
+
 async function runSync() {
+  if (isSyncing) {
+    console.log('Sync is already in progress, skipping duplicate request.');
+    return { status: 'skipped', message: 'Sync is already running.' };
+  }
+
+  isSyncing = true;
   console.log(`--- Starting sync at ${new Date().toISOString()} ---`);
+
   try {
     const rawItems = await fetchNorishList();
     if (rawItems.length > 0) {
       const normalizedItems = await normalizeItemsWithGemini(rawItems);
-      await syncWithAnyList(normalizedItems);
+      const addedCount = await syncWithAnyList(normalizedItems);
+      return { status: 'success', message: `Successfully added ${addedCount} new items.` };
     } else {
       console.log('No items found in Norish list. Skipping sync.');
+      return { status: 'success', message: 'No items found in Norish list.' };
     }
   } catch (error) {
     console.error('Sync failed:', error);
+    return { status: 'error', error: error.message };
   } finally {
+    isSyncing = false;
     console.log(`--- Sync finished at ${new Date().toISOString()} ---`);
   }
 }
@@ -187,4 +191,27 @@ const cronSchedule = process.env.CRON_SCHEDULE || '0 * * * *'; // Default to eve
 console.log(`Scheduling background sync with cron pattern: ${cronSchedule}`);
 cron.schedule(cronSchedule, () => {
   runSync();
+});
+
+// Setup Express server for frontend trigger
+const app = express();
+const PORT = process.env.PORT || 3010;
+
+app.use(express.static(path.join(__dirname, 'public')));
+
+app.post('/api/sync', async (req, res) => {
+  try {
+    const result = await runSync();
+    if (result.status === 'error') {
+        res.status(500).json(result);
+    } else {
+        res.json(result);
+    }
+  } catch (error) {
+      res.status(500).json({ error: error.message });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`Frontend and API listening on port ${PORT}`);
 });

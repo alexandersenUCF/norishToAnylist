@@ -6,6 +6,8 @@ services:
     image: norish-to-anylist:latest
     container_name: norish-to-anylist
     restart: unless-stopped
+    ports:
+      - "${PORT:-3010}:${PORT:-3010}"
     env_file:
       - .env
     environment:
@@ -15,3 +17,4 @@ services:
       - NORISH_API_KEY=${NORISH_API_KEY}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - CRON_SCHEDULE=${CRON_SCHEDULE:-0 * * * *}
+      - PORT=${PORT:-3010}
