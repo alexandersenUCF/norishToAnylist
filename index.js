@@ -31,6 +31,7 @@ async function fetchNorishList() {
     const response = await axios.get(process.env.NORISH_API_URL, {
       headers: {
         'Authorization': `Bearer ${process.env.NORISH_API_KEY}`,
+        'x-api-key': process.env.NORISH_API_KEY,
       }
     });
 
