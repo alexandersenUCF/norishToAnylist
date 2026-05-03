@@ -1,5 +1,5 @@
-◇ injected env (7) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
---- Starting sync at 2026-05-03T20:10:54.743Z ---
+◇ injected env (7) from .env // tip: ⌘ suppress logs { quiet: true }
+--- Starting sync at 2026-05-03T20:31:23.874Z ---
 Fetching shopping list from Norish (http://your-norish-instance.local/api/v1/shopping-list)...
 Scheduling background sync with cron pattern: 0 * * * *
 Frontend and API listening on port 3000
@@ -18,7 +18,7 @@ Sync failed: AxiosError: getaddrinfo ENOTFOUND your-norish-instance.local
     at Axios.request (/app/node_modules/axios/dist/node/axios.cjs:4871:41)
     at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
     at async fetchNorishList (/app/index.js:30:22)
-    at async runSync (/app/index.js:392:22) {
+    at async runSync (/app/index.js:429:22) {
   isAxiosError: true,
   code: 'ENOTFOUND',
   config: [Object: null prototype] {
@@ -187,4 +187,4 @@ Sync failed: AxiosError: getaddrinfo ENOTFOUND your-norish-instance.local
     hostname: 'your-norish-instance.local'
   }
 }
---- Sync finished at 2026-05-03T20:10:54.897Z ---
+--- Sync finished at 2026-05-03T20:31:24.029Z ---

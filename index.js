@@ -92,6 +92,22 @@ function parseNum(numStr) {
 
 function extractIngredient(raw) {
     let s = raw.toLowerCase().trim();
+    // Normalize "2x apples" to "2 apples"
+    s = s.replace(/(\d+)x\s/i, '$1 ');
+
+    // Protect "half and half" / "half & half"
+    const isHalfAndHalf = s.includes('half & half') || s.includes('half and half');
+    if (isHalfAndHalf) {
+        s = s.replace(/half \& half/g, 'halfandhalf').replace(/half and half/g, 'halfandhalf');
+    }
+
+    // Protect percentages (e.g. 90%)
+    const pctMatch = s.match(/([\d.]+)\s*%/);
+    let pctStr = '';
+    if (pctMatch) {
+        pctStr = pctMatch[0];
+        s = s.replace(pctMatch[0], 'PCTHOLDER');
+    }
 
     // 1. Extract embedded quantities like (4), (1/2 stick), (5 ounces each)
     let qtyFromParen = 0;
@@ -133,6 +149,11 @@ function extractIngredient(raw) {
 
     // Strip all parentheses and their contents, asterisks, hyphens
     s = s.replace(/\([^)]*\)/g, ' ').replace(/[*-]/g, ' ');
+
+    // Strip everything after a comma (preparation instructions)
+    if (s.includes(',')) {
+        s = s.split(',')[0];
+    }
 
     // 3. Extract leading numbers
     let quantity = qtyFromParen;
@@ -182,7 +203,16 @@ function extractIngredient(raw) {
     // Remove prep words to get the base ingredient name
     let finalWords = [];
     for (let w of words) {
-        // Strip non-alpha
+        // Strip non-alpha, EXCEPT if it's the pct placeholder
+        if (w === 'pctholder') {
+            finalWords.push(pctStr);
+            continue;
+        }
+        if (w === 'halfandhalf') {
+            finalWords.push('half & half');
+            continue;
+        }
+
         let cleanW = w.replace(/[^a-z]/g, '');
         if (!prepWords.includes(cleanW) && cleanW !== '' && cleanW !== 'of' && cleanW !== 'or') {
             finalWords.push(cleanW);
@@ -206,12 +236,19 @@ function extractIngredient(raw) {
         if (quantity === 0 && qtyFromParen > 0) quantity = qtyFromParen;
         if (quantity === 0) quantity = 1; // Default to at least 1
     }
-    if (name.includes('ground beef')) {
+    if (name.includes('ground beef') || name.includes('beef')) {
         name = 'ground beef';
         if (quantity === 0) quantity = 1;
         if (!unit) unit = 'pound';
     }
     if (name.includes('olive oil')) name = 'olive oil';
+    if (name.includes('peas') && name.includes('carrots')) name = 'peas and carrots';
+    if (name.includes('pork loin')) {
+        name = 'pork loin chops';
+    }
+    if (name.includes('chicken thigh')) {
+        name = 'chicken thighs';
+    }
 
     // If an item has NO quantity, default it to 1 so AnyList shows "1" instead of nothing.
     if (quantity === 0) {
