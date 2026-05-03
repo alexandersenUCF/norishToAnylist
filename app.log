@@ -1,5 +1,5 @@
-◇ injected env (7) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
---- Starting sync at 2026-05-03T19:32:27.663Z ---
+◇ injected env (7) from .env // tip: ◈ secrets for agents [www.dotenvx.com]
+--- Starting sync at 2026-05-03T19:38:30.411Z ---
 Fetching shopping list from Norish (http://your-norish-instance.local/api/v1/shopping-list)...
 Scheduling background sync with cron pattern: 0 * * * *
 Frontend and API listening on port 3000
@@ -187,4 +187,4 @@ Sync failed: AxiosError: getaddrinfo ENOTFOUND your-norish-instance.local
     hostname: 'your-norish-instance.local'
   }
 }
---- Sync finished at 2026-05-03T19:32:27.813Z ---
+--- Sync finished at 2026-05-03T19:38:30.556Z ---
