@@ -1,0 +1,28 @@
+{
+  "name": "app",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alexandersenUCF/norishToAnylist.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/alexandersenUCF/norishToAnylist/issues"
+  },
+  "homepage": "https://github.com/alexandersenUCF/norishToAnylist#readme",
+  "dependencies": {
+    "@google/genai": "^1.51.0",
+    "anylist": "^0.8.6",
+    "axios": "^1.16.0",
+    "dotenv": "^17.4.2",
+    "node-cron": "^4.2.1"
+  }
+}

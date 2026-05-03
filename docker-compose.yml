@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  norish-to-anylist:
+    build: .
+    image: norish-to-anylist:latest
+    container_name: norish-to-anylist
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - ANYLIST_EMAIL=${ANYLIST_EMAIL}
+      - ANYLIST_PASSWORD=${ANYLIST_PASSWORD}
+      - NORISH_API_URL=${NORISH_API_URL}
+      - NORISH_API_KEY=${NORISH_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - CRON_SCHEDULE=${CRON_SCHEDULE:-0 * * * *}
