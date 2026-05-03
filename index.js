@@ -5,6 +5,7 @@ const { GoogleGenAI } = require('@google/genai');
 const AnyList = require('anylist');
 const cron = require('node-cron');
 const path = require('path');
+const https = require('https');
 
 // Check required environment variables
 const REQUIRED_ENV_VARS = [
@@ -95,8 +96,18 @@ async function normalizeItemsWithGemini(rawItems) {
       }
     };
 
+    // Create an HTTPS agent with keep-alive to prevent firewalls/NATs
+    // from dropping the connection during long AI processing times.
+    const httpsAgent = new https.Agent({
+        keepAlive: true,
+        keepAliveMsecs: 10000,
+        timeout: 180000 // 3 minutes
+    });
+
     const response = await axios.post(url, payload, {
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 180000, // 3 minutes overall request timeout
+        httpsAgent: httpsAgent
     });
 
     const jsonString = response.data.candidates[0].content.parts[0].text;
