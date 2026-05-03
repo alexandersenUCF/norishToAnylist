@@ -1,7 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
-const { GoogleGenAI } = require('@google/genai');
+// Removed GoogleGenAI
 const AnyList = require('anylist');
 const cron = require('node-cron');
 const path = require('path');
@@ -12,8 +12,7 @@ const REQUIRED_ENV_VARS = [
   'ANYLIST_EMAIL',
   'ANYLIST_PASSWORD',
   'NORISH_API_URL',
-  'NORISH_API_KEY',
-  'GEMINI_API_KEY'
+  'NORISH_API_KEY'
 ];
 
 for (const envVar of REQUIRED_ENV_VARS) {
@@ -23,8 +22,7 @@ for (const envVar of REQUIRED_ENV_VARS) {
   }
 }
 
-// Initialize Gemini client
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const { parseIngredient } = require('parse-ingredient');
 
 async function fetchNorishList() {
   try {
@@ -226,7 +224,7 @@ async function runSync() {
   try {
     const rawItems = await fetchNorishList();
     if (rawItems.length > 0) {
-      const normalizedItems = await normalizeItemsWithGemini(rawItems);
+      const normalizedItems = await normalizeItemsLocally(rawItems);
       const addedCount = await syncWithAnyList(normalizedItems);
       return { status: 'success', message: `Successfully added ${addedCount} new items.` };
     } else {
