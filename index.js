@@ -60,62 +60,84 @@ async function fetchNorishList() {
   }
 }
 
-async function normalizeItemsWithGemini(rawItems) {
+async function normalizeItemsLocally(rawItems) {
   if (rawItems.length === 0) {
     return [];
   }
 
-  console.log('Sending items to Gemini for normalization...');
-  const prompt = `
-    I have a list of raw ingredient strings from a recipe app.
-    Please normalize these strings into a clean JSON array of objects.
+  console.log(`Parsing ${rawItems.length} items locally...`);
 
-    CRITICAL INSTRUCTIONS:
-    1. You must combine duplicate ingredients. If "garlic" appears multiple times (e.g. "3 cloves garlic", "1 clove garlic"), you must combine them into a single object with the total summed quantity: { "name": "garlic", "quantity": "4 cloves" }.
-    2. Do the math to combine quantities if they share the same unit (e.g., 2 cups + 1 cup = 3 cups). If the units are completely different and cannot be summed safely, list them together (e.g. "1 tbsp + 2 cups").
-    3. The "name" should be the base ingredient (e.g., "apple cider", "garlic", "kosher salt").
-    4. The "quantity" should be a string representing the total amount needed (e.g., "5 cloves", "1/2 cup", "1 gallon"). If no quantity is specified, omit the quantity field or leave it blank.
+  const ingredientMap = new Map();
 
-    Here is the list of raw ingredients to process:
-    ${JSON.stringify(rawItems, null, 2)}
-  `;
+  for (const raw of rawItems) {
+      if (!raw || typeof raw !== 'string') continue;
 
-  try {
-    // Workaround for Node.js native fetch UND_ERR_SOCKET bug on Windows:
-    // Make a direct REST call using Axios instead of the @google/genai SDK.
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
-
-    const payload = {
-      contents: [{
-        parts: [{ text: prompt }]
-      }],
-      generationConfig: {
-        responseMimeType: "application/json"
+      let parsed;
+      try {
+          const result = parseIngredient(raw);
+          if (result && result.length > 0) {
+              parsed = result[0];
+          }
+      } catch (e) {
+          // If the parser fails, we fall back to using the raw string as the description.
       }
-    };
 
-    // Create an HTTPS agent with keep-alive to prevent firewalls/NATs
-    // from dropping the connection during long AI processing times.
-    const httpsAgent = new https.Agent({
-        keepAlive: true,
-        keepAliveMsecs: 10000,
-        timeout: 180000 // 3 minutes
-    });
+      let description = parsed && parsed.description ? parsed.description.toLowerCase().trim() : raw.toLowerCase().trim();
+      let quantity = parsed && parsed.quantity ? parseFloat(parsed.quantity) : 0;
+      let unit = parsed && parsed.unitOfMeasure ? parsed.unitOfMeasure.toLowerCase().trim() : '';
 
-    const response = await axios.post(url, payload, {
-        headers: { 'Content-Type': 'application/json' },
-        timeout: 180000, // 3 minutes overall request timeout
-        httpsAgent: httpsAgent
-    });
+      // Cleanup common artifacts
+      description = description.replace(/^-\s*/, '').replace(/\*$/, '').trim();
 
-    const jsonString = response.data.candidates[0].content.parts[0].text;
-    const parsedItems = JSON.parse(jsonString);
-    console.log(`Successfully normalized ${parsedItems.length} items using Gemini.`);
-    return parsedItems;
-  } catch (error) {
-    console.error('Error normalizing with Gemini:', error);
-    throw error;
+      // Special logic: The parser sometimes leaves things like "garlic cloves" vs "cloves garlic".
+      // Let's do some basic normalization for "garlic" and "cloves"
+      if (description.includes('garlic clove') || description.includes('clove of garlic') || description.includes('cloves garlic') || description === 'garlic cloves (-minced)' || description === 'garlic cloves, minced') {
+          description = 'garlic';
+          if (!unit) unit = 'cloves';
+      }
+
+      if (ingredientMap.has(description)) {
+          const existing = ingredientMap.get(description);
+
+          if (quantity > 0) {
+              // Try to sum if the units match or if neither has a unit
+              if (existing.unit === unit || (!existing.unit && !unit)) {
+                 existing.quantity += quantity;
+                 // Inherit unit if existing had none
+                 if (!existing.unit && unit) existing.unit = unit;
+              } else {
+                 // Different units, just append it as a text string instead of trying to convert volume to mass.
+                 existing.extraText = existing.extraText ? existing.extraText + ` + ${quantity} ${unit}` : `${quantity} ${unit}`;
+              }
+          }
+      } else {
+          ingredientMap.set(description, {
+              name: description,
+              quantity: quantity,
+              unit: unit,
+              extraText: ''
+          });
+      }
   }
+
+  const finalItems = [];
+  for (const [key, val] of ingredientMap.entries()) {
+      let finalQuantityStr = '';
+      if (val.quantity > 0) {
+          finalQuantityStr = `${val.quantity}${val.unit ? ' ' + val.unit : ''}`;
+      }
+      if (val.extraText) {
+          finalQuantityStr += finalQuantityStr ? ` + ${val.extraText}` : val.extraText;
+      }
+
+      finalItems.push({
+          name: val.name,
+          quantity: finalQuantityStr.trim()
+      });
+  }
+
+  console.log(`Successfully aggregated into ${finalItems.length} unique items.`);
+  return finalItems;
 }
 
 async function syncWithAnyList(normalizedItems) {
